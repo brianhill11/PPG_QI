@@ -248,10 +248,10 @@ if __name__ == '__main__':
                                  verbose=0,
                                  save_best_only=True,
                                  save_weights_only=False,
-                                 mode='auto',
+                                 mode='max',
                                  save_freq='epoch')
 
-    early_stop = EarlyStopping(monitor='val_roc', patience=10, verbose=2)
+    early_stop = EarlyStopping(monitor='val_roc', patience=5, verbose=1, mode='max')
 
     # train the model
     if load_weights:
