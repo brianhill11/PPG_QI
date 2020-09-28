@@ -14,20 +14,13 @@ from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_fscore_su
 import tensorflow as tf
 
 from tensorflow.keras import backend as K
-from tensorflow.keras.utils import Sequence, to_categorical
+from tensorflow.keras.utils import Sequence
 from tensorflow.keras.models import Model
-from tensorflow.keras.optimizers import Adam, RMSprop, Nadam
-from tensorflow.keras.backend import repeat_elements, expand_dims
-from tensorflow.keras.initializers import RandomUniform, RandomNormal, Constant
-from tensorflow.keras.losses import mean_squared_error, mean_absolute_error
-from tensorflow.keras.layers import Dense, BatchNormalization, LeakyReLU, Dropout, ZeroPadding1D, UpSampling1D
-from tensorflow.keras.layers import Lambda, Activation, Concatenate, Softmax
-from tensorflow.keras.layers import Conv1D, MaxPool1D, Flatten, SeparableConv1D
-from tensorflow.keras.layers import Input, Reshape, Cropping1D, SpatialDropout1D, RepeatVector, ReLU, Activation
-
-from tensorflow.keras import regularizers
-from tensorflow.keras.utils import plot_model
-from tensorflow.keras.callbacks import ModelCheckpoint
+from tensorflow.keras.optimizers import Nadam
+from tensorflow.keras.layers import Dense, BatchNormalization
+from tensorflow.keras.layers import Conv1D, MaxPool1D, Flatten
+from tensorflow.keras.layers import Input, ReLU
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
 
 import matplotlib as mpl
 import platform
@@ -42,7 +35,7 @@ window_size = 400
 batch_size = 32
 
 load_scaler_pickle = False
-load_weights = True
+load_weights = False
 
 if not os.path.exists("weights"):
     os.makedirs("weights")
@@ -195,10 +188,12 @@ def create_model():
     model = Model(inputs=inputs, outputs=[output])
     model.compile(loss='binary_crossentropy',
                   optimizer=optimizer,
-                  metrics=['acc', tf.keras.metrics.AUC(curve='ROC'), tf.keras.metrics.AUC(curve='PR')])
+                  metrics=['acc',
+                           tf.keras.metrics.AUC(curve='ROC', name="roc"),
+                           tf.keras.metrics.AUC(curve='PR', name="pr")])
     model.summary()
 
-    plot_model(model, to_file=os.path.join("model.png"), show_shapes=True)
+    # plot_model(model, to_file=os.path.join("model.png"), show_shapes=True)
     return model
 
 
@@ -249,12 +244,14 @@ if __name__ == '__main__':
     print(train_gen.__getitem__(0)[0].shape)
 
     checkpoint = ModelCheckpoint(os.path.join("weights", "weights.{epoch:02d}.hdf5"),
-                                 monitor='acc',
+                                 monitor='val_roc',
                                  verbose=0,
                                  save_best_only=True,
                                  save_weights_only=False,
                                  mode='auto',
-                                 save_freq=1)
+                                 save_freq='epoch')
+
+    early_stop = EarlyStopping(monitor='val_roc', patience=10, verbose=2)
 
     # train the model
     if load_weights:
@@ -266,11 +263,11 @@ if __name__ == '__main__':
 
     history = model.fit(x=train_gen,
                         validation_data=val_gen,
-                        validation_steps=50,
+                        # validation_steps=50,
                         # steps_per_epoch=1000,
-                        epochs=30,
+                        epochs=80,
                         verbose=1,
-                        callbacks=[checkpoint],
+                        callbacks=[checkpoint, early_stop],
                         initial_epoch=0,
                         use_multiprocessing=False,
                         max_queue_size=500,
