@@ -121,7 +121,7 @@ class DataGenerator(Sequence):
         for f in tqdm(self.patient_files):
             self.file_count += 1
             if self.file_count % 5000 == 0:
-                pickle.dump(self.X_scaler, open("ppg_qi_scaler.pkl", 'wb'))
+                pickle.dump(self.X_scaler, open("weights/ppg_qi_scaler.pkl", 'wb'))
             #         for f in self.data_files:
             x = np.load(os.path.join(f), allow_pickle=True)
             #             print(X.shape)
@@ -222,9 +222,9 @@ if __name__ == '__main__':
                                   label_file=label_file,
                                   window_len=window_size,
                                   batch_size=batch_size)
-        pickle.dump(train_gen.X_scaler, open("ppg_qi_scaler.pkl", "wb"))
+        pickle.dump(train_gen.X_scaler, open("weights/ppg_qi_scaler.pkl", "wb"))
     else:
-        X_scaler = pickle.load(open("ppg_qi_scaler.pkl", "rb"))
+        X_scaler = pickle.load(open("weights/ppg_qi_scaler.pkl", "rb"))
         train_gen = DataGenerator(data_dir=data_dir,
                                   patients=train_patients,
                                   label_file=label_file,
