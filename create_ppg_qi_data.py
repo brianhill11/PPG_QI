@@ -2,9 +2,9 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import pickle
 from tqdm import tqdm
 import glob
+import argparse
 
 # order of signals in .npy files
 ecg_col = 0
@@ -15,56 +15,92 @@ nibp_dias_col = 4
 nibp_mean_col = 5
 abp_col = -1  # should be 6
 
-data_dir = "/Volumes/External/mimic_v9_4s/train_patients"
-data_files = glob.glob(os.path.join(data_dir, "*.npy"))
-window_len = 400
 
-save_dir = "/Volumes/External/ppg_qi/mimic_v9_4s"
-numpy_save_dir = os.path.join(save_dir, "ppg_arrays")
-image_save_dir = os.path.join(save_dir, "ppg_images")
+def main():
+    parser = argparse.ArgumentParser(description="Script for generating feature matrices from raw waveform windows")
+    parser.add_argument('--data-dir', help='Directory  with input file(s) containing raw windows',
+                        default="/Volumes/External/mimic_v9_4s/train_patients", dest="data_dir")
+    parser.add_argument('--save-dir', help='Directory to save result files',
+                        default="/Volumes/External/ppg_qi/mimic_v9_4s", dest="save_dir")
+    parser.add_argument('--signal-type', help="The signal_type to use (either 'ppg', 'abp', or 'ecg')",
+                        required=True, dest="signal_type")
+    parser.add_argument('--window-length', help="Length of the waveform windows (default=400)",
+                        default=400, dest="window_len", type=int)
+    parser.add_argument('--num_files', help="Number of files to sample (default=5000)",
+                        default=5000, dest="num_files", type=int)
+    args = parser.parse_args()
 
-if not os.path.exists(numpy_save_dir):
-    os.makedirs(numpy_save_dir)
-if not os.path.exists(image_save_dir):
-    os.makedirs(image_save_dir)
+    signal_type = args.signal_type
+    if signal_type not in ["ppg", "abp", "ecg"]:
+        raise ValueError("--signal_type must be either 'ppg', 'abp', or 'ecg'")
 
-image_file_paths = []
+    data_dir = args.data_dir
+    if not os.path.exists(data_dir):
+        raise OSError("Data directory does not exist: {}".format(data_dir))
+    print("Getting list of numpy arrays...")
+    data_files = glob.glob(os.path.join(data_dir, "*.npy"))
+    window_len = args.window_len
 
-for f in tqdm(np.random.choice(data_files, size=5000)):
-    patient_id = os.path.basename(f).split("_")[0]
-    file_id = os.path.basename(f).split("_")[1]
-    X = np.load(os.path.join(data_dir, f), allow_pickle=True)
-    num_windows = int(X.shape[0] / window_len)
+    save_dir = args.save_dir
+    numpy_save_dir = os.path.join(save_dir, "{}_arrays".format(signal_type))
+    image_save_dir = os.path.join(save_dir, "{}_images".format(signal_type))
 
-    # choose a random spot in the waveform
-    # for i in range(num_windows):
-    for i in range(5):
+    if not os.path.exists(numpy_save_dir):
+        os.makedirs(numpy_save_dir)
+    if not os.path.exists(image_save_dir):
+        os.makedirs(image_save_dir)
+
+    image_file_paths = []
+
+    for f in tqdm(np.random.choice(data_files, size=args.num_files)):
+        patient_id = os.path.basename(f).split("_")[0]
+        file_id = os.path.basename(f).split("_")[1]
+        X = np.load(os.path.join(data_dir, f), allow_pickle=True)
+        num_windows = int(X.shape[0] / window_len)
+
         # choose a random spot in the waveform
-        val = np.random.randint(low=0, high=num_windows)
-        idx = int(val * window_len)
-        # for each window in file
-        # idx = int(i * window_len)
+        # for i in range(num_windows):
+        for i in range(5):
+            # choose a random spot in the waveform
+            val = np.random.randint(low=0, high=num_windows)
+            idx = int(val * window_len)
+            # for each window in file
+            # idx = int(i * window_len)
 
-        # we use a sliding window to check if we have a valid batch of data
-        # (i.e. every window in in sliding window needs to be valid; this possibly
-        # can be relaxed using some threshold)
-        ekg = X[idx:idx + window_len, ecg_col]
-        ppg = X[idx:idx + window_len, ppg_col]
-        abp = X[idx:idx + window_len, abp_col]
+            # we use a sliding window to check if we have a valid batch of data
+            # (i.e. every window in in sliding window needs to be valid; this possibly
+            # can be relaxed using some threshold)
+            ecg = X[idx:idx + window_len, ecg_col]
+            ppg = X[idx:idx + window_len, ppg_col]
+            abp = X[idx:idx + window_len, abp_col]
 
-        # save numpy array with ppg data to file
-        numpy_filename = "{}_{}_{}.npy".format(patient_id, file_id, i)
-        np.save(os.path.join(numpy_save_dir, numpy_filename), ppg)
-        # save image of ppg signal to file
-        image_filename = "{}_{}_{}.jpg".format(patient_id, file_id, i)
-        fig, ax = plt.subplots(3, 1, figsize=(12, 8))
-        ax[0].plot(abp, c='green')
-        # ax2 = ax.twinx()
-        ax[1].plot(ppg, c='orange')
-        image_file_path = os.path.join(image_save_dir, image_filename)
-        plt.savefig(image_file_path)
-        plt.close()
-        image_file_paths.append(os.path.join("http://localhost:8080/static/ppg_images", image_filename))
+            if signal_type == "ecg":
+                signal = ecg
+            elif signal_type == "ppg":
+                signal = ppg
+            elif signal_type == "abp":
+                signal = abp
+            else:
+                raise ValueError("--signal_type must be either 'ppg', 'abp', or 'ecg'")
 
-pd.DataFrame(image_file_paths, columns=["image"]).to_csv(os.path.join(save_dir, "image_file_paths.csv"),
-                                                         index=False, header=True)
+            # save numpy array with signal data to file
+            numpy_filename = "{}_{}_{}.npy".format(patient_id, file_id, i)
+            np.save(os.path.join(numpy_save_dir, numpy_filename), signal)
+            # save image of signals to file
+            image_filename = "{}_{}_{}.jpg".format(patient_id, file_id, i)
+            fig, ax = plt.subplots(3, 1, figsize=(12, 8))
+            ax[0].plot(abp, c='green')
+            ax[1].plot(ppg, c='orange')
+            ax[2].plot(ecg, c='blue')
+            image_file_path = os.path.join(image_save_dir, image_filename)
+            plt.savefig(image_file_path)
+            plt.close()
+            image_file_paths.append(os.path.join("http://localhost:8080/static/{}_images".format(signal_type),
+                                                 image_filename))
+
+    pd.DataFrame(image_file_paths, columns=["image"]).to_csv(os.path.join(save_dir, "image_file_paths.csv"),
+                                                             index=False, header=True)
+
+
+if __name__ == "__main__":
+    main()
