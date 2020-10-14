@@ -26,7 +26,7 @@ def main():
                         required=True, dest="signal_type")
     parser.add_argument('--window-length', help="Length of the waveform windows (default=400)",
                         default=400, dest="window_len", type=int)
-    parser.add_argument('--num_files', help="Number of files to sample (default=5000)",
+    parser.add_argument('--num-files', help="Number of files to sample (default=5000)",
                         default=5000, dest="num_files", type=int)
     args = parser.parse_args()
 
@@ -98,8 +98,10 @@ def main():
             image_file_paths.append(os.path.join("http://localhost:8080/static/{}_images".format(signal_type),
                                                  image_filename))
 
-    pd.DataFrame(image_file_paths, columns=["image"]).to_csv(os.path.join(save_dir, "image_file_paths.csv"),
-                                                             index=False, header=True)
+    pd.DataFrame(image_file_paths, columns=["image"]).to_csv(
+        os.path.join(save_dir,
+                     "{}_image_file_paths.csv".format(signal_type)),
+        index=False, header=True)
 
 
 if __name__ == "__main__":
