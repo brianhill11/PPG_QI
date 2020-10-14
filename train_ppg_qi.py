@@ -326,7 +326,7 @@ if __name__ == '__main__':
     plt.show()
 
     print("=" * 40)
-    precision_threshold = 0.90
+    precision_threshold = 0.95
     # get minimum threshold where precision is >= precision_threshold
     threshold = np.min(thresholds[np.where(precision[:-1] >= precision_threshold)])
     print("threshold for precision of {}: {}".format(precision_threshold, threshold))
