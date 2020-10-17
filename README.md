@@ -16,12 +16,37 @@ The probability of a window being valid can be interpreted as a quality index.
 # Install all package dependencies
 pip install -e .
 ```
-3. Start the label-studio server, supplying the path to save label-studio project files
+3. Create a soft link to the directory containing the image files, so they can be served locally (see [this issue](https://github.com/heartexlabs/label-studio/issues/49) for details)
+```
+ln -s /path/to/ppg_images label-studio/static/ppg_images
+```
+4. Initialize the label-studio project, supplying the path to save the label-studio project files
+```
+python label_studio/server.py init ../wave_qi/wave_qi
+```
+5. Start the label-studio server, supplying the path to save label-studio project files
 ```
 python label_studio/server.py start ../wave_qi/wave_qi
 ```
-4. Load the .csv file that contains locations of the waveform images for labeling
-5. Once windows are labeled, export the labeling results as a .csv file
+6. Click the "Setup" tab to configure the project settings
+
+Set up the project as an "Image classification" ask, and set the Labeling Config like this: 
+```
+<View>
+  <Image name="image" value="$image"/>
+  <Choices name="ppg" toName="image" showInLine="true">
+    <Choice value="invalid" background="red"/>
+    <Choice value="neutral" background="blue" />
+    <Choice value="valid" background="green" />
+  </Choices>
+</View>
+```
+And click Save at the bottom of the page. 
+This will give you three classification options per image: (1) invalid, (2) neutral (not sure), and (3) valid. 
+
+7. To to the Import tab to load the `[signal]_image_file_paths.csv` file that contains locations of the waveform images for labeling
+8. Go to the Labeling tab and start labeling images. Note that the number keys can be used as keyboard shortcuts for labels. 
+9. Once windows are labeled, go to the Export tab and choose CSV as the export format to save the labeling results as a .csv file
 
 ## Training the QI models
 
