@@ -14,6 +14,7 @@ nibp_sys_col = 3
 nibp_dias_col = 4
 nibp_mean_col = 5
 abp_col = -1  # should be 6
+sample_freq = 100
 
 
 def main():
@@ -28,6 +29,10 @@ def main():
                         default=400, dest="window_len", type=int)
     parser.add_argument('--num-files', help="Number of files to sample (default=5000)",
                         default=5000, dest="num_files", type=int)
+    parser.add_argument('--fig-height', help="Height of matplotlib.pyplot figure",
+                        default=8, dest="fig_height", type=int)
+    parser.add_argument('--fig-length', help="Length of matplotlib.pyplot figure",
+                        default=12, dest="fig_length", type=int)
     args = parser.parse_args()
 
     signal_type = args.signal_type
@@ -73,6 +78,9 @@ def main():
             ecg = X[idx:idx + window_len, ecg_col]
             ppg = X[idx:idx + window_len, ppg_col]
             abp = X[idx:idx + window_len, abp_col]
+            prox = X[idx:idx + window_len, prox_col]
+            nibp_sys = X[idx:idx + window_len, nibp_sys_col]
+            nibp_dias = X[idx:idx + window_len, nibp_dias_col]
 
             if signal_type == "ecg":
                 signal = ecg
@@ -88,20 +96,27 @@ def main():
             np.save(os.path.join(numpy_save_dir, numpy_filename), signal)
             # save image of signals to file
             image_filename = "{}_{}_{}.jpg".format(patient_id, file_id, i)
-            fig, ax = plt.subplots(3, 1, figsize=(12, 8))
+            fig, ax = plt.subplots(4, 1, figsize=(args.fig_length, args.fig_height))
+            ax[0].set_title("Sys: {:.0f} Dias: {:.0f} Time: {:.0f}".format(np.median(nibp_sys),
+                                                                           np.median(nibp_dias),
+                                                                           np.median(prox) / sample_freq))
             ax[0].plot(abp, c='green')
-            ax[1].plot(ppg, c='orange')
-            ax[2].plot(ecg, c='blue')
+            ax[0].plot(nibp_sys, c='red', linestyle='--')
+            ax[0].plot(nibp_dias, c='red', linestyle='--')
+            # ax[0].set_ylim([0, 200])
+            ax[1].plot(abp[0:int(window_len / 4)], c='green')
+            ax[2].plot(ppg, c='orange')
+            ax[3].plot(ecg, c='blue')
             image_file_path = os.path.join(image_save_dir, image_filename)
             plt.savefig(image_file_path)
             plt.close()
             image_file_paths.append(os.path.join("http://localhost:8080/static/{}_images".format(signal_type),
                                                  image_filename))
 
-    pd.DataFrame(image_file_paths, columns=["image"]).to_csv(
-        os.path.join(save_dir,
-                     "{}_image_file_paths.csv".format(signal_type)),
-        index=False, header=True)
+        pd.DataFrame(image_file_paths, columns=["image"]).to_csv(
+            os.path.join(save_dir,
+                         "{}_image_file_paths.csv".format(signal_type)),
+            index=False, header=True)
 
 
 if __name__ == "__main__":
