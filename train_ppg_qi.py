@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import pickle
 import glob
 import json
+import shutil
 from tqdm import tqdm
 
 from sklearn.preprocessing import StandardScaler
@@ -30,6 +31,7 @@ if platform.system() == 'Darwin':
 
 project_dir = "/Volumes/External/ppg_qi/mimic_v9_4s"
 data_dir = os.path.join(project_dir, "ppg_arrays")
+image_dir = os.path.join(project_dir, "ppg_images")
 train_split = 0.7
 window_size = 400
 batch_size = 32
@@ -48,6 +50,25 @@ def get_file_from_url(url):
      from http://localhost:8080/static/ppg_images/p058128-2176-08-29-18-04_135_4.jpg
     """
     return url.split("/")[-1]
+
+
+def sort_image_files_by_label(label_df, image_dir, save_dir):
+    """
+    Sort the waveform images files into separate directories based on classification label
+    label_df: dataframe containing image name and classification label
+    image_dir: directory containing the waveform image files
+    save_dir: directory to save the sorted images
+    """
+    for c in label_df["ppg"].unique():
+        save_dir_class = os.path.join(save_dir, c)
+        # create new directory to store images of class c
+        os.makedirs(save_dir_class, exist_ok=True)
+        # get all of the images belonging to class c
+        images_to_copy = label_df[label_df["ppg"] == c]["image_file"]
+        print("Copying {} {} images...".format(images_to_copy.shape[0], c))
+        # copy these images to their class directory
+        for image in images_to_copy:
+            shutil.copy2(os.path.join(image_dir, image), os.path.join(save_dir_class, image))
 
 
 class DataGenerator(Sequence):
@@ -200,15 +221,19 @@ def create_model():
 if __name__ == '__main__':
     label_file = os.path.join(project_dir, "result.csv")
     label_df = pd.read_csv(label_file, sep=",", header=0)
+
+    # create separate directories to exclusively store images from each class
+    label_df["image_file"] = label_df["image"].apply(lambda fn: get_file_from_url(fn))
+    sort_image_files_by_label(label_df, image_dir, os.path.join(project_dir, "images_by_class"))
+
     label_df["patient_ids"] = label_df["image"].apply(lambda fn: get_file_from_url(fn).split("-")[0])
     valid_patients = label_df["patient_ids"].unique()
 
-    # file_list = glob.glob(os.path.join(data_dir, "*.npy"))
-    # print("Found {} files".format(len(file_list)))
-    # patient_list = np.unique([os.path.basename(x).split("-")[0] for x in file_list])
-    # print("Found {} total patients".format(len(patient_list)))
-    # # get list of patients for which we have training data
-    # patient_list = list(set(valid_patients).intersection(set(patient_list)))
+    print("Label distribution:")
+    print(label_df["ppg"].value_counts(normalize=True))
+    print("Window per patient distribution:")
+    print(label_df.groupby("patient_ids").apply(lambda x: x.shape[0]).describe(include="all"))
+
     patient_list = label_df["patient_ids"].unique()
     print("Found {} valid patients with labeled data".format(len(patient_list)))
     train_patients, test_patients = train_test_split(patient_list, train_size=train_split)
