@@ -10,12 +10,13 @@ from tqdm import tqdm
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_fscore_support, precision_recall_curve
+from sklearn.metrics import roc_curve, roc_auc_score, average_precision_score, precision_score, recall_score
+from sklearn.metrics import precision_recall_fscore_support, precision_recall_curve
 
 import tensorflow as tf
 
 from tensorflow.keras import backend as K
-from tensorflow.keras.utils import Sequence
+from tensorflow.keras.utils import Sequence, plot_model
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Nadam
 from tensorflow.keras.layers import Dense, BatchNormalization
@@ -69,6 +70,14 @@ def sort_image_files_by_label(label_df, image_dir, save_dir):
         # copy these images to their class directory
         for image in images_to_copy:
             shutil.copy2(os.path.join(image_dir, image), os.path.join(save_dir_class, image))
+
+
+def ci(values, alpha=0.95):
+    # if we get lower value, flip
+    if alpha < 0.5:
+        alpha = 1. - alpha
+    interp = "lower"
+    return np.quantile(values, 1.-alpha, interpolation=interp), np.quantile(values, alpha, interpolation=interp)
 
 
 class DataGenerator(Sequence):
@@ -214,7 +223,8 @@ def create_model():
                            tf.keras.metrics.AUC(curve='PR', name="pr")])
     model.summary()
 
-    # plot_model(model, to_file=os.path.join("model.png"), show_shapes=True)
+    os.makedirs("figures", exist_ok=True)
+    plot_model(model, to_file=os.path.join("figures", "model.png"), show_shapes=True)
     return model
 
 
@@ -324,28 +334,33 @@ if __name__ == '__main__':
         os.makedirs("figures")
     fpr, tpr, thresholds = roc_curve(val_true, val_preds)
 
-    fig, ax = plt.subplots(1, 2, figsize=(12, 4))
+    fig, ax = plt.subplots(1, 2, figsize=(12, 6))
     lw = 2
+    fontsize = 14
     ax[0].plot(fpr, tpr, color='darkorange',
                lw=lw, label='ROC curve (area = %0.2f)' % roc_auc_score(val_true, val_preds))
     ax[0].plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
     ax[0].set_xlim([0.0, 1.0])
     ax[0].set_ylim([0.0, 1.05])
-    ax[0].set_xlabel('False Positive Rate')
-    ax[0].set_ylabel('True Positive Rate')
-    ax[0].set_title('Receiver operating characteristic example')
-    ax[0].legend(loc="lower right")
+    ax[0].tick_params(axis='both', which='major', labelsize=fontsize)
+    ax[0].set_xlabel('False Positive Rate', fontsize=fontsize)
+    ax[0].set_ylabel('True Positive Rate', fontsize=fontsize)
+    ax[0].set_title('ROC Curve', fontsize=fontsize)
+    ax[0].legend(loc="lower right", fontsize=fontsize)
 
     # plot precision-recall curve
     precision, recall, thresholds = precision_recall_curve(val_true, val_preds)
-    ax[1].plot(recall, precision, marker='.')
+    ax[1].plot(recall, precision, marker='.', lw=lw,
+               label='P-R curve (area = %0.2f)' % average_precision_score(val_true, val_preds))
     ax[1].set_xlim([0.0, 1.0])
     ax[1].set_ylim([0.0, 1.05])
+    ax[1].tick_params(axis='both', which='major', labelsize=fontsize)
     # axis labels
-    ax[1].set_xlabel('Recall')
-    ax[1].set_ylabel('Precision')
+    ax[1].set_xlabel('Recall', fontsize=fontsize)
+    ax[1].set_ylabel('Precision', fontsize=fontsize)
+    ax[1].set_title('Precision-Recall Curve', fontsize=fontsize)
     # show the legend
-    ax[1].legend()
+    ax[1].legend(loc="lower right", fontsize=fontsize)
 
     plt.savefig(os.path.join("figures", "roc_pr_curves.png"))
     plt.show()
@@ -356,9 +371,28 @@ if __name__ == '__main__':
     threshold = np.min(thresholds[np.where(precision[:-1] >= precision_threshold)])
     print("threshold for precision of {}: {}".format(precision_threshold, threshold))
 
-    print("ROC AUC: {:.3f}".format(roc_auc_score(val_true, val_preds)))
+    # calculate bootstrapped metrics
+    roc_auc_bs = []
+    pr_auc_bs = []
+    precision_bc = []
+    recall_bc = []
+    num_bootstrap = 1000
+    for _ in range(num_bootstrap):
+        bootstrap_idx = np.random.choice(np.arange(len(val_true)), size=len(val_true), replace=True)
+        val_true_bs = np.array(val_true)[bootstrap_idx]
+        val_prob_bs = np.array(val_preds)[bootstrap_idx]
+        roc_auc_bs.append(roc_auc_score(val_true_bs, val_prob_bs))
+        pr_auc_bs.append(average_precision_score(val_true_bs, val_prob_bs))
+        val_pred_bs = [1 if x > threshold else 0 for x in val_prob_bs]
+        precision_bc.append(precision_score(val_true_bs, val_pred_bs))
+        recall_bc.append(recall_score(val_true_bs, val_pred_bs))
+
+    print("ROC AUC: {:.3f} ({:.3f}-{:.3f})".format(np.mean(roc_auc_bs), *ci(roc_auc_bs)))
+    print("PR AUC: {:.3f} ({:.3f}-{:.3f})".format(np.mean(pr_auc_bs), *ci(pr_auc_bs)))
+    print("Precision: {:.3f} ({:.3f}-{:.3f})".format(np.mean(precision_bc), *ci(precision_bc)))
+    print("Recall: {:.3f} ({:.3f}-{:.3f})".format(np.mean(recall_bc), *ci(recall_bc)))
     print("=" * 40)
-    print("Precison Recall F-score Support:",
+    print("Precision Recall F-score Support:",
           precision_recall_fscore_support(val_true,
                                           [1 if x > threshold else 0 for x in val_preds],
                                           pos_label=1,
