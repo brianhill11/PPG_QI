@@ -1,4 +1,4 @@
-# Wave-QI
+# PPG-QI
 Waveform Quality Index (QI) models
 
 This repo contains code for generating image/array pairs for waveform windows, and then training CNN models to predict whether or not a window is valid/invalid. 
