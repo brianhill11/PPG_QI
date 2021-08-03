@@ -6,6 +6,8 @@ The probability of a window being valid can be interpreted as a quality index.
 
 3 steps are required for creating the quality index models: (1) generating waveform images to label, (2) labeling the waveform images as valid/invalid, and (3) training a CNN model to generate the quality index. 
 
+For additional details, please see [Imputation of the continuous arterial line blood pressure waveform from non-invasive measurements using deep learning](https://www.nature.com/articles/s41598-021-94913-y).
+
 ## Generating input data
 
 ## Loading data into Label Studio
@@ -50,3 +52,12 @@ This will give you three classification options per image: (1) invalid, (2) neut
 
 ## Training the QI models
 
+## Citation
+
+If you use the PPG QI model in your work, please cite:
+
+```
+Hill, B.L., Rakocz, N., Rudas, Á. et al. Imputation of the continuous arterial line 
+blood pressure waveform from non-invasive measurements using deep learning. 
+Sci Rep 11, 15755 (2021). https://doi.org/10.1038/s41598-021-94913-y
+```
