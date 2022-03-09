@@ -8,6 +8,10 @@ The probability of a window being valid can be interpreted as a quality index.
 
 For additional details, please see [Imputation of the continuous arterial line blood pressure waveform from non-invasive measurements using deep learning](https://www.nature.com/articles/s41598-021-94913-y).
 
+## Applying the trained model to new data
+
+For an example of how to load the model weights and generate predictions on new PPG waveform data, see [filter_existing_files.py](filter_existing_files.py).
+
 ## Generating input data
 
 ## Loading data into Label Studio
